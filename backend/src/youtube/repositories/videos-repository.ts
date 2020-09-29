@@ -1,6 +1,9 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { DynamoDB } from "aws-sdk";
+
 import { YoutubeVideo } from "../domains/youtube-video.entity";
+import { VideoMap } from "../mapper";
+
 import { IVideosRepository } from "./videos-repository.interface";
 
 @Injectable()
@@ -10,7 +13,16 @@ export class VideosRepository implements IVideosRepository {
     private readonly documentClient: DynamoDB.DocumentClient,
   ) {}
 
-  create(video: YoutubeVideo): Promise<YoutubeVideo> {
+  async create(video: YoutubeVideo): Promise<YoutubeVideo> {
+    try {
+      await this.documentClient.put({
+        TableName: process.env.TABLE_NAME,
+        Item: VideoMap.toPersistence(video),
+        ConditionExpression: 'attribute_not_exists(pk)',
+      }).promise();
 
+      return video;
+    } catch (e) {
+    }
   }
 }

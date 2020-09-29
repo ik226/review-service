@@ -8,7 +8,7 @@ export type VideoRaw = {
   videoUrl: string,
   channelTitle: string,
   channelId: string,
-  thubmnail: any,
+  thumbnail: any,
   publishedAt: number,
-};
+} & VideoPrimaryKey;
 

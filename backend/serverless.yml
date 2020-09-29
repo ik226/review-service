@@ -131,8 +131,8 @@ package:
   excludeDevDependencies: true
 
 functions:
-  youtube:
-    handler: src/video-crawler.handler
+  get-videos-initializer:
+    handler: src/get-videos-initializer.handler
     memorySize: 512
     timeout: 5
     events:
@@ -141,31 +141,18 @@ functions:
           event: s3:ObjectCreated:Put
           existing: true
 
-  # upload-postprocess:
-  #   handler: src/upload-postprocess.handler
-  #   memorySize: 256
-  #   events:
-  #     - s3:
-  #         bucket: ${self:provider.environment.BUCKET_NAME}
-  #         event: s3:ObjectCreated:Post
-  #         existing: true
-
-  # video-transcode-postprocess:
-  #   handler: src/video-transcode-postprocess.handler
-  #   memorySize: 256
-  #   events:
-  #     - eventBridge:
-  #         pattern:
-  #           source:
-  #             - aws.mediaconvert
-  #           detail-type:
-  #             - MediaConvert Job State Change
-  #           detail:
-  #             status:
-  #               - 'PROGRESSING'
-  #               - 'STATUS_UPDATE'
-  #               - 'COMPLETE'
-  #               - 'ERROR'
+  get-videos:
+    handler: src/get-videos.handler
+    memorySize: 512
+    timeout: 5
+    events:
+      - eventBridge:
+          eventBus: review-service
+          pattern:
+            source:
+              - review-service.video
+            detail-type:
+              - NewItemUpdated
 
 resources:
   Resources:
