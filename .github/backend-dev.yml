@@ -1,0 +1,193 @@
+name: Backend Dev
+
+on:
+  push:
+    branches-ignore:
+      - master
+    paths:
+      - 'backend/**'
+
+env:
+  AWS_DEFAULT_REGION: ap-northeast-2
+  AWS_ACCESS_KEY_ID: ${{ secrets.DEV_AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.DEV_AWS_SECRET_ACCESS_KEY }}
+
+
+jobs:
+  install-dependencies:
+    if: contains(github.event.head_commit.message, 'skip ci') == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: '12.x'
+
+      - name: Restore dependencies from cache
+        id: cache
+        uses: actions/cache@v1
+        with:
+          path: ./backend/node_modules
+          key: ${{ runner.os }}-backend-yarn-${{ hashFiles(format('{0}{1}', github.workspace, '/backend/yarn.lock')) }}
+          restore-keys: |
+            ${{ runner.os }}-backend-yarn-
+
+      - name: Install dependencies
+        working-directory: ./backend
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
+
+  lint:
+    runs-on: ubuntu-latest
+    needs: [install-dependencies]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: '12.x'
+
+      - name: Restore dependencies from cache
+        id: cache
+        uses: actions/cache@v1
+        with:
+          path: ./backend/node_modules
+          key: ${{ runner.os }}-backend-yarn-${{ hashFiles(format('{0}{1}', github.workspace, '/backend/yarn.lock')) }}
+          restore-keys: |
+            ${{ runner.os }}-backend-yarn-
+
+      - name: Install dependencies
+        working-directory: ./backend
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
+
+      - name: Lint
+        working-directory: ./backend
+        run: yarn lint
+
+  # unit-testing:
+  #   runs-on: ubuntu-latest
+  #   needs: [install-dependencies]
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v2
+
+  #     - name: Setup node.js
+  #       uses: actions/setup-node@v1
+  #       with:
+  #         node-version: '12.x'
+
+  #     - name: Restore dependencies from cache
+  #       id: cache
+  #       uses: actions/cache@v1
+  #       with:
+  #         path: ./backend/node_modules
+  #         key: ${{ runner.os }}-backend-yarn-${{ hashFiles(format('{0}{1}', github.workspace, '/backend/yarn.lock')) }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-backend-yarn-
+
+  #     - name: Install dependencies
+  #       working-directory: ./backend
+  #       if: steps.cache.outputs.cache-hit != 'true'
+  #       run: yarn install --frozen-lockfile
+
+  #     - name: Unit testing
+  #       working-directory: ./backend
+  #       run: yarn test:unit --ci --coverage --passWithNoTests
+
+  #     - name: Upload test coverage
+  #       uses: codecov/codecov-action@v1
+  #       with:
+  #         token: ${{ secrets.CODECOV_TOKEN }}
+  #         flags: backend
+
+  # e2e-testing:
+  #   runs-on: ubuntu-latest
+  #   needs: [install-dependencies]
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v2
+
+  #     - name: Setup node.js
+  #       uses: actions/setup-node@v1
+  #       with:
+  #         node-version: '12.x'
+
+  #     - name: Restore dependencies from cache
+  #       id: cache
+  #       uses: actions/cache@v1
+  #       with:
+  #         path: ./backend/node_modules
+  #         key: ${{ runner.os }}-backend-yarn-${{ hashFiles(format('{0}{1}', github.workspace, '/backend/yarn.lock')) }}
+  #         restore-keys: |
+  #           ${{ runner.os }}-backend-yarn-
+
+  #     - name: Install dependencies
+  #       working-directory: ./backend
+  #       if: steps.cache.outputs.cache-hit != 'true'
+  #       run: yarn install --frozen-lockfile
+
+  #     - name: E2E testing
+  #       working-directory: ./backend
+  #       run: yarn test:e2e --ci --coverage --passWithNoTests
+
+  #     - name: Upload test coverage
+  #       uses: codecov/codecov-action@v1
+  #       with:
+  #         token: ${{ secrets.CODECOV_TOKEN }}
+  #         flags: backend
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [lint, unit-testing, e2e-testing]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup node.js
+        uses: actions/setup-node@v1
+        with:
+          node-version: '12.x'
+
+      - name: Restore dependencies from cache
+        id: cache
+        uses: actions/cache@v1
+        with:
+          path: ./backend/node_modules
+          key: ${{ runner.os }}-backend-yarn-${{ hashFiles(format('{0}{1}', github.workspace, '/backend/yarn.lock')) }}
+          restore-keys: |
+            ${{ runner.os }}-backend-yarn-
+
+      - name: Install dependencies
+        working-directory: ./backend
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
+
+      # - name: Export environment variables from AWS SSM
+      #   uses: classtinginc/chamber-action@master
+      #   with:
+      #     args: export --output-file ./backend/.env.json dev/media-service
+
+      # - name: Generate swagger document
+      #   working-directory: ./backend
+      #   env:
+      #     JWT_PUBLIC_KEY: none
+      #   run: yarn generate:swagger
+
+      - name: Deploy
+        working-directory: ./backend
+        run: yarn sls deploy -s dev
+        # run: |
+        #   yarn sls create_domain -s dev
+        #   yarn sls deploy -s dev
+
+      # - name: Restart graphql
+      #   run: |
+      #     aws lambda update-function-configuration \
+      #       --function-name "classting-graphql-dev-graphql" \
+      #       --description "[media-service-backend] deployed at: $(date)"

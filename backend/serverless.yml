@@ -1,0 +1,198 @@
+service: review-service
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  region: ${opt:region, 'ap-northeast-2'}
+  endpointType: 'regional'
+  stage: ${opt:stage, 'dev'}
+  logRetentionInDays: 14
+  logs:
+    httpApi: true
+  httpApi:
+    cors: true
+    payload: '1.0'
+  tracing:
+    apiGateway: true
+    lambda: true
+  environment:
+    STAGE: ${self:provider.stage}
+    SERVICE: ${self:service}
+    TABLE_NAME: ${self:service}-${self:provider.stage}
+    BUCKET_NAME: video-crawling-list-${self:provider.stage}
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+  deploymentBucket:
+    name: sls-review-${self:provider.stage}-${self:provider.region}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:*
+      Resource:
+        - !GetAtt [ReviewServiceTable, Arn]
+        - !Join ['/', [!GetAtt [ReviewServiceTable, Arn], 'index/*']]
+    - Effect: Allow
+      Action:
+        - s3:*
+      Resource:
+        - !GetAtt [ReviewServiceBucket, Arn]
+        - !Join ['/', [!GetAtt [ReviewServiceBucket, Arn], '*']]
+    - Effect: Allow
+      Action:
+        - events:PutEvents
+      Resource: '*'
+
+plugins:
+  - serverless-webpack
+  - serverless-dynamodb-local
+  - serverless-s3-local
+  - serverless-offline
+  # - './plugins/offline-invalidate'
+  # - serverless-domain-manager
+  # - serverless-sentry
+  # - serverless-stack-termination-protection
+
+custom:
+  serverlessTerminationProtection:
+    stages:
+      - prod
+
+  # sentry:
+  #   dsn: ${self:provider.environment.SENTRY_DSN}
+  #   organization: classting-inc
+  #   project: ${self:service}
+  #   authToken: ${ssm:/${self:provider.stage}/${self:service}/sentry_auth_token~true}
+  #   release:
+  #     version: git
+    # Please enable when testing Sentry in the development environment
+    # filterLocal: false
+
+  serverless-offline:
+    host: 0.0.0.0
+    port: 3000
+    noPrependStageInUrl: true
+
+  webpack:
+    webpackConfig: ./webpack.config.js
+    packager: 'yarn'
+    includeModules:
+      forceInclude:
+        - class-transformer
+        - class-validator
+
+  # domainNames:
+  #   prod: apis.classting.com
+  #   stag: apis.classting.net
+  #   dev: apis.classting.dev
+
+  # certificateNames:
+  #   prod: '*.classting.com'
+  #   stag: '*.classting.net'
+  #   dev: '*.classting.dev'
+
+  # domainName: ${self:custom.domainNames.${self:provider.stage}}
+  # certificateName: ${self:custom.certificateNames.${self:provider.stage}}
+
+  # customDomain:
+  #   http:
+  #     domainName: ${self:custom.domainName}
+  #     basePath: ${self:service}
+  #     certificateName: ${self:custom.certificateName}
+  #     createRoute53Record: false
+  #     endpointType: 'regional'
+  #     securityPolicy: tls_1_2
+
+  dynamodb:
+    stages:
+      - test
+      - dev
+    start:
+      port: 8000
+      inMemory: true
+      migrate: true
+
+  s3:
+    address: 'localhost'
+    host: 'localhost'
+    port: 8001
+    directory: './.buckets'
+    allowMismatchedSignatures: true
+
+  # mediaHost:
+  #   dev: https://classting-media-dev.s3.ap-northeast-2.amazonaws.com # FIXME
+  #   stag: https://classting-media-stag.s3.ap-northeast-2.amazonaws.com # FIXME
+  #   prod: https://media.classting.com # FIXME
+
+  # imageHost:
+  #   dev: https://d20015sk8i00wg.cloudfront.net
+  #   stag: https://dr4wrxpwv053x.cloudfront.net
+  #   prod: https://media.classting.com # FIXME
+
+package:
+  excludeDevDependencies: true
+
+functions:
+  youtube:
+    handler: src/video-crawler.handler
+    memorySize: 512
+    timeout: 5
+    events:
+      - s3:
+          bucket: ${self:provider.environment.BUCKET_NAME}
+          event: s3:ObjectCreated:Put
+          existing: true
+
+  # upload-postprocess:
+  #   handler: src/upload-postprocess.handler
+  #   memorySize: 256
+  #   events:
+  #     - s3:
+  #         bucket: ${self:provider.environment.BUCKET_NAME}
+  #         event: s3:ObjectCreated:Post
+  #         existing: true
+
+  # video-transcode-postprocess:
+  #   handler: src/video-transcode-postprocess.handler
+  #   memorySize: 256
+  #   events:
+  #     - eventBridge:
+  #         pattern:
+  #           source:
+  #             - aws.mediaconvert
+  #           detail-type:
+  #             - MediaConvert Job State Change
+  #           detail:
+  #             status:
+  #               - 'PROGRESSING'
+  #               - 'STATUS_UPDATE'
+  #               - 'COMPLETE'
+  #               - 'ERROR'
+
+resources:
+  Resources:
+    ReviewServiceTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      Properties:
+        TableName: ${self:provider.environment.TABLE_NAME}
+        AttributeDefinitions:
+          - AttributeName: pk
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pk
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        # TimeToLiveSpecification:
+        #   AttributeName: ttl
+        #   Enabled: true
+
+    ReviewServiceBucket:
+      Type: AWS::S3::Bucket
+      DeletionPolicy: Retain
+      Properties:
+        BucketName: ${self:provider.environment.BUCKET_NAME}
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders: ['*']
+              AllowedMethods: [GET, POST, PUT]
+              AllowedOrigins: ['*']
+              MaxAge: '3600'
