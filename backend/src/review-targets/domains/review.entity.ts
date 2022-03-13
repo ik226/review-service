@@ -1,13 +1,10 @@
-import { Entity } from '../../base';
-
-import { Author } from './author.entity';
+import { Entity, Timestamp } from '../../base';
 
 type IReviewProps = {
-  author: Author;
+  authorId: string;
+  reviewTargetId: string;
   rating: number;
   description: string;
-  createdAt: Date;
-  updatedAt: Date;
 };
 
 export class Review extends Entity<IReviewProps> {
@@ -19,8 +16,28 @@ export class Review extends Entity<IReviewProps> {
     return new Review(props, id);
   }
 
+  get id(): string {
+    return this._id;
+  }
+
+  get description(): string {
+    return this.props.description;
+  }
+
+  get authorId(): string {
+    return this.props.authorId;
+  }
+
+  get reviewTargetId(): string {
+    return this.props.reviewTargetId;
+  }
+
   get rating(): number {
     return this.props.rating;
+  }
+
+  get createdAt(): Date {
+    return this._createdAt;
   }
 
   public update(props: Partial<IReviewProps>): void {
@@ -31,7 +48,5 @@ export class Review extends Entity<IReviewProps> {
     if (props.rating) {
       this.props.rating = props.rating;
     }
-
-    this.props.updatedAt = new Date();
   }
 }

@@ -1,7 +1,8 @@
 /* istanbul ignore file */
+import { DataMapper } from '@aws/dynamodb-data-mapper';
 import { DynamoDB } from 'aws-sdk';
 
-export const documentClientFactory = (): DynamoDB.DocumentClient => {
+export const dynamoDbDataMapperFactory = (): DataMapper => {
   const options: DynamoDB.ClientConfiguration = {
     region: 'localhost',
     endpoint: 'http://localhost:8000',
@@ -9,7 +10,7 @@ export const documentClientFactory = (): DynamoDB.DocumentClient => {
 
   const isOffline = !!process.env.IS_OFFLINE || !!process.env.IS_LOCAL;
 
-  return isOffline
-    ? new DynamoDB.DocumentClient(options)
-    : new DynamoDB.DocumentClient();
+  const client = isOffline ? new DynamoDB(options) : new DynamoDB();
+
+  return new DataMapper({ client });
 };

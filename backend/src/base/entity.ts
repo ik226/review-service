@@ -4,11 +4,13 @@ const isEntity = (v: any): v is Entity<any> => {
 
 export abstract class Entity<T> {
   protected readonly _id: string;
+  protected readonly _createdAt: Date;
   protected props: T;
 
   constructor(props: T, id: string) {
     this._id = id;
     this.props = props;
+    this._createdAt = new Date();
   }
 
   public equals(object?: Entity<T>): boolean {

@@ -1,5 +1,6 @@
 import { Author } from '../domains/author.entity';
-import { AuthorSchema } from './author.schema';
+
+import { AuthorSchema } from './schema/author.schema';
 
 export class AuthorMap {
   public static toPersistence(author: Author): AuthorSchema {
